@@ -1,0 +1,1056 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DP1 Path A — What Led Up to the Changes?</title>
+
+  <style>
+    /* ============================================================
+       CRASH LAB DESIGN SYSTEM — CSS VARIABLES
+       ============================================================ */
+    :root {
+      --navy:        #1F2A44;
+      --orange:      #F97316;
+      --blue:        #3B82F6;
+      --offwhite:    #F8FAFC;
+      --lightgray:   #E5E7EB;
+      --steelgray:   #6B7280;
+
+      /* Derived tokens */
+      --navy-light:  #2E3D5C;
+      --navy-dark:   #141B2D;
+      --orange-glow: rgba(249, 115, 22, 0.25);
+      --blue-glow:   rgba(59, 130, 246, 0.20);
+      --radius-sm:   6px;
+      --radius-md:   12px;
+      --radius-lg:   18px;
+      --shadow-card: 0 4px 24px rgba(0,0,0,0.35);
+      --shadow-btn:  0 2px 8px rgba(0,0,0,0.3);
+      --font-display: 'Courier New', Courier, monospace;
+      --font-body:    Georgia, 'Times New Roman', serif;
+      --font-ui:      Verdana, Geneva, sans-serif;
+    }
+
+    /* ============================================================
+       GLOBAL RESET & BASE
+       ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html, body {
+      min-height: 100vh;
+      background: var(--navy-dark);
+      color: var(--offwhite);
+      font-family: var(--font-body);
+      font-size: 16px;
+      line-height: 1.6;
+    }
+
+    /* Subtle grid-line background texture */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        repeating-linear-gradient(0deg, transparent, transparent 39px, rgba(59,130,246,0.06) 39px, rgba(59,130,246,0.06) 40px),
+        repeating-linear-gradient(90deg, transparent, transparent 39px, rgba(59,130,246,0.06) 39px, rgba(59,130,246,0.06) 40px);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    /* ============================================================
+       PAGE WRAPPER
+       ============================================================ */
+    .page-wrapper {
+      position: relative;
+      z-index: 1;
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 24px 16px 48px;
+    }
+
+    /* ============================================================
+       HEADER BANNER
+       ============================================================ */
+    .header-banner {
+      background: linear-gradient(135deg, var(--navy-light) 0%, var(--navy) 100%);
+      border: 1px solid rgba(59,130,246,0.3);
+      border-radius: var(--radius-lg);
+      padding: 20px 28px;
+      margin-bottom: 24px;
+      box-shadow: var(--shadow-card);
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .header-badge {
+      background: var(--orange);
+      color: #fff;
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: bold;
+      letter-spacing: 1.5px;
+      padding: 4px 10px;
+      border-radius: 4px;
+      white-space: nowrap;
+      flex-shrink: 0;
+      box-shadow: 0 0 12px var(--orange-glow);
+    }
+
+    .header-titles {
+      flex: 1;
+    }
+
+    .header-titles h1 {
+      font-family: var(--font-display);
+      font-size: clamp(16px, 3vw, 22px);
+      font-weight: bold;
+      color: var(--offwhite);
+      letter-spacing: 0.5px;
+      line-height: 1.2;
+    }
+
+    .header-titles p {
+      font-family: var(--font-ui);
+      font-size: 13px;
+      color: var(--steelgray);
+      margin-top: 4px;
+    }
+
+    /* ============================================================
+       TRACK STAGE — car animation area
+       ============================================================ */
+    .track-stage {
+      position: relative;
+      width: 100%;
+      /* ── ADJUST: change this height if your track image is taller/shorter ── */
+      height: 220px;
+      background-color: #111827;
+      border-radius: var(--radius-md);
+      overflow: hidden;
+      border: 2px solid rgba(59,130,246,0.25);
+      box-shadow: var(--shadow-card);
+      margin-bottom: 20px;
+    }
+
+    /* Track background image */
+    .track-bg {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      /* If your track image has a specific aspect ratio, adjust object-position */
+      object-position: center;
+      /* Fallback tint if image fails to load */
+      background: #1a2332;
+    }
+
+    /* Fallback drawn track (shows if image fails) */
+    .track-fallback {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: flex-end;
+      padding-bottom: 32px;
+    }
+
+    /* ── ADJUST: barrier position = how far from the left the wall is (percentage) ── */
+    .barrier {
+      position: absolute;
+      /* BARRIER X POSITION — change this value to move the wall left or right */
+      right: 6%;
+      /* BARRIER Y — aligns barrier vertically on the track surface */
+      bottom: 0;
+      top: 0;
+      width: 14px;
+      background: repeating-linear-gradient(
+        -45deg,
+        var(--orange) 0px, var(--orange) 6px,
+        #1F2A44 6px, #1F2A44 12px
+      );
+      border-left: 3px solid var(--orange);
+      border-radius: 2px;
+      box-shadow: -4px 0 16px rgba(249,115,22,0.5);
+      /* Uncomment next line to hide the barrier if your background image already shows one: */
+      /* display: none; */
+    }
+
+    /* Car image on track */
+    .car-on-track {
+      position: absolute;
+      /* ── ADJUST: CAR VERTICAL POSITION ─ move up/down to sit on your track surface ── */
+      bottom: 28px;       /* pixels from bottom of stage — increase to move car up */
+      /* ── ADJUST: CAR SIZE ── */
+      width: clamp(80px, 14%, 120px);
+      height: auto;
+      /* Starting X is set by JS — see CAR_START_X below */
+      left: 4%;
+      transition: none;   /* animation is JS-driven, not CSS transition */
+      filter: drop-shadow(0 4px 8px rgba(0,0,0,0.6));
+      z-index: 10;
+    }
+
+    /* Speed readout overlay */
+    .speed-readout {
+      position: absolute;
+      top: 12px;
+      right: 16px;
+      background: rgba(31,42,68,0.88);
+      border: 1px solid var(--blue);
+      border-radius: var(--radius-sm);
+      padding: 8px 14px;
+      font-family: var(--font-display);
+      font-size: clamp(13px, 2vw, 16px);
+      color: var(--blue);
+      z-index: 20;
+      box-shadow: 0 0 12px var(--blue-glow);
+      opacity: 0;
+      transform: translateY(-4px);
+      transition: opacity 0.4s ease, transform 0.4s ease;
+    }
+
+    .speed-readout.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .speed-readout .speed-label {
+      font-size: 10px;
+      letter-spacing: 1px;
+      color: var(--steelgray);
+      display: block;
+      margin-bottom: 2px;
+    }
+
+    /* ============================================================
+       TEST BUTTONS
+       ============================================================ */
+    .test-controls {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 20px;
+    }
+
+    .btn-test {
+      flex: 1;
+      min-width: 140px;
+      padding: 14px 20px;
+      border: none;
+      border-radius: var(--radius-md);
+      font-family: var(--font-display);
+      font-size: clamp(13px, 2.2vw, 15px);
+      font-weight: bold;
+      letter-spacing: 0.8px;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
+    }
+
+    .btn-test::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: rgba(255,255,255,0.08);
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+
+    .btn-test:hover::after  { opacity: 1; }
+    .btn-test:active        { transform: scale(0.97); }
+    .btn-test:disabled      { opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .btn-test-1 {
+      background: linear-gradient(135deg, #2E3D5C, #1F2A44);
+      color: var(--offwhite);
+      border: 2px solid var(--blue);
+      box-shadow: 0 0 0 0 var(--blue-glow);
+    }
+    .btn-test-1:hover:not(:disabled) { box-shadow: 0 0 12px var(--blue-glow); }
+
+    .btn-test-2 {
+      background: linear-gradient(135deg, #2E3D5C, #1F2A44);
+      color: var(--offwhite);
+      border: 2px solid #8B5CF6;
+      box-shadow: 0 0 0 0 rgba(139,92,246,0.25);
+    }
+    .btn-test-2:hover:not(:disabled) { box-shadow: 0 0 12px rgba(139,92,246,0.3); }
+
+    .btn-test-3 {
+      background: linear-gradient(135deg, #2E3D5C, #1F2A44);
+      color: var(--offwhite);
+      border: 2px solid var(--orange);
+      box-shadow: 0 0 0 0 var(--orange-glow);
+    }
+    .btn-test-3:hover:not(:disabled) { box-shadow: 0 0 12px var(--orange-glow); }
+
+    /* Active / running state */
+    .btn-test.running {
+      animation: pulse-border 0.8s infinite alternate;
+    }
+
+    @keyframes pulse-border {
+      from { opacity: 0.7; }
+      to   { opacity: 1.0; }
+    }
+
+    /* Icon inside button */
+    .btn-icon { margin-right: 6px; font-size: 14px; }
+
+    /* ============================================================
+       DATA LOG TABLE
+       ============================================================ */
+    .data-log-card {
+      background: var(--navy-light);
+      border: 1px solid rgba(59,130,246,0.2);
+      border-radius: var(--radius-md);
+      padding: 18px 20px;
+      margin-bottom: 20px;
+      box-shadow: var(--shadow-card);
+    }
+
+    .card-title {
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: var(--orange);
+      text-transform: uppercase;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .card-title::before {
+      content: '';
+      display: inline-block;
+      width: 3px;
+      height: 14px;
+      background: var(--orange);
+      border-radius: 2px;
+    }
+
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--font-ui);
+      font-size: clamp(12px, 1.8vw, 14px);
+    }
+
+    .data-table th {
+      text-align: left;
+      font-size: 10px;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      color: var(--steelgray);
+      padding: 6px 10px;
+      border-bottom: 1px solid rgba(107,114,128,0.3);
+    }
+
+    .data-table td {
+      padding: 10px 10px;
+      border-bottom: 1px solid rgba(107,114,128,0.15);
+      color: var(--offwhite);
+      vertical-align: middle;
+    }
+
+    .data-table tr:last-child td { border-bottom: none; }
+
+    .log-status {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+    }
+
+    .log-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--steelgray);
+      flex-shrink: 0;
+    }
+
+    .log-dot.done { background: #22C55E; box-shadow: 0 0 6px rgba(34,197,94,0.5); }
+
+    .log-speed {
+      font-family: var(--font-display);
+      font-size: 14px;
+      color: var(--blue);
+    }
+
+    .log-speed.empty { color: var(--steelgray); font-size: 11px; }
+
+    .log-time {
+      font-size: 11px;
+      color: var(--steelgray);
+    }
+
+    /* ============================================================
+       FIELD JOURNAL
+       ============================================================ */
+    .field-journal-card {
+      background: linear-gradient(135deg, #FFF8ED 0%, #FEF3C7 100%);
+      border: 2px solid #D97706;
+      border-radius: var(--radius-md);
+      padding: 20px 22px;
+      margin-bottom: 20px;
+      box-shadow: 0 4px 20px rgba(217,119,6,0.15), var(--shadow-card);
+      position: relative;
+      overflow: hidden;
+    }
+
+    /* Spiral binding decoration */
+    .field-journal-card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; bottom: 0;
+      width: 28px;
+      background: repeating-linear-gradient(
+        180deg,
+        transparent 0px, transparent 20px,
+        #D97706 20px, #D97706 21px
+      );
+      opacity: 0.25;
+    }
+
+    .field-journal-card::after {
+      content: '';
+      position: absolute;
+      top: 0; left: 13px; bottom: 0;
+      width: 3px;
+      background: repeating-linear-gradient(
+        180deg,
+        transparent 0px, transparent 16px,
+        #B45309 16px, #B45309 22px
+      );
+      opacity: 0.4;
+      border-radius: 4px;
+    }
+
+    .journal-inner {
+      padding-left: 24px;
+    }
+
+    .journal-header {
+      font-family: var(--font-display);
+      font-size: 11px;
+      letter-spacing: 2px;
+      color: #92400E;
+      text-transform: uppercase;
+      margin-bottom: 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .journal-prompt {
+      font-family: var(--font-body);
+      font-size: clamp(14px, 2.2vw, 16px);
+      color: #1C1917;
+      line-height: 1.7;
+      margin-bottom: 14px;
+    }
+
+    .journal-prompt strong {
+      color: #7C2D12;
+    }
+
+    .journal-textarea {
+      width: 100%;
+      min-height: 110px;
+      padding: 12px 14px;
+      border: 1.5px solid #D97706;
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.7);
+      color: #1C1917;
+      font-family: var(--font-body);
+      font-size: 15px;
+      line-height: 1.65;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    .journal-textarea:focus {
+      border-color: #B45309;
+      box-shadow: 0 0 0 3px rgba(217,119,6,0.15);
+      background: rgba(255,255,255,0.9);
+    }
+
+    .journal-textarea::placeholder {
+      color: #A8A29E;
+    }
+
+    .autosave-indicator {
+      font-family: var(--font-ui);
+      font-size: 11px;
+      color: #78716C;
+      text-align: right;
+      margin-top: 6px;
+      height: 16px;
+    }
+
+    .autosave-indicator.saved { color: #16A34A; }
+
+    /* ============================================================
+       BOTTOM NAV — Back / Continue
+       ============================================================ */
+    .bottom-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 16px;
+      flex-wrap: wrap;
+      margin-top: 8px;
+    }
+
+    .btn-nav {
+      padding: 14px 28px;
+      border-radius: var(--radius-md);
+      font-family: var(--font-display);
+      font-size: 14px;
+      font-weight: bold;
+      letter-spacing: 1px;
+      cursor: pointer;
+      border: none;
+      transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s;
+    }
+
+    .btn-nav:active { transform: scale(0.97); }
+
+    .btn-back {
+      background: transparent;
+      color: var(--steelgray);
+      border: 2px solid var(--steelgray);
+    }
+
+    .btn-back:hover {
+      border-color: var(--offwhite);
+      color: var(--offwhite);
+    }
+
+    .btn-continue {
+      background: linear-gradient(135deg, var(--orange) 0%, #EA580C 100%);
+      color: #fff;
+      box-shadow: 0 4px 16px var(--orange-glow);
+    }
+
+    .btn-continue:hover {
+      box-shadow: 0 6px 24px rgba(249,115,22,0.45);
+      transform: translateY(-1px);
+    }
+
+    /* Progress hint between buttons */
+    .progress-hint {
+      font-family: var(--font-ui);
+      font-size: 11px;
+      color: var(--steelgray);
+      letter-spacing: 0.5px;
+    }
+
+    /* ============================================================
+       RESPONSIVE ADJUSTMENTS
+       ============================================================ */
+    @media (max-width: 600px) {
+      .header-banner { flex-direction: column; align-items: flex-start; gap: 10px; }
+      .test-controls  { flex-direction: column; }
+      .btn-test       { min-width: unset; }
+      .bottom-nav     { justify-content: center; }
+      .progress-hint  { display: none; }
+    }
+
+    /* ============================================================
+       ANIMATION: car slide-in on page load
+       ============================================================ */
+    @keyframes fadeSlideDown {
+      from { opacity: 0; transform: translateY(-12px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .header-banner  { animation: fadeSlideDown 0.5s ease both; }
+    .track-stage    { animation: fadeSlideDown 0.5s 0.1s ease both; }
+    .test-controls  { animation: fadeSlideDown 0.5s 0.2s ease both; }
+    .data-log-card  { animation: fadeSlideDown 0.5s 0.3s ease both; }
+    .field-journal-card { animation: fadeSlideDown 0.5s 0.4s ease both; }
+    .bottom-nav     { animation: fadeSlideDown 0.5s 0.5s ease both; }
+
+  </style>
+</head>
+<body>
+
+<div class="page-wrapper">
+
+  <!-- ===== HEADER ===== -->
+  <header class="header-banner">
+    <span class="header-badge">DP1 · PATH A</span>
+    <div class="header-titles">
+      <h1>What Led Up to the Changes?</h1>
+      <p>Where Did the Energy Go? — 5th Grade SINS Investigation</p>
+    </div>
+  </header>
+
+  <!-- ===== TRACK STAGE ===== -->
+  <section class="track-stage" id="trackStage" aria-label="Car test track simulation">
+
+    <!--
+      BACKGROUND TRACK IMAGE
+      Replace "Energy_track.png" with the correct path/filename if needed.
+      If the image is in a subfolder: src="assets/Energy_track.png"
+    -->
+    <img
+      class="track-bg"
+      src="Energy_track.png"
+      alt="Test track with barrier"
+      onerror="this.style.display='none'"
+    />
+
+    <!-- Barrier stripe (hide if your track image already shows a barrier) -->
+    <div class="barrier" id="barrier" aria-hidden="true"></div>
+
+    <!--
+      CAR IMAGE
+      Replace "Energy_car.png" with the correct path/filename if needed.
+      The car's left-position (%) is controlled entirely in JavaScript below.
+    -->
+    <img
+      class="car-on-track"
+      id="carImage"
+      src="Energy_car.png"
+      alt="Test car"
+      onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 80 32\'><rect x=\'2\' y=\'10\' width=\'76\' height=\'16\' rx=\'4\' fill=\'%23F97316\'/><rect x=\'10\' y=\'6\' width=\'40\' height=\'14\' rx=\'3\' fill=\'%23EA580C\'/><circle cx=\'14\' cy=\'28\' r=\'5\' fill=\'%231F2A44\'/><circle cx=\'14\' cy=\'28\' r=\'3\' fill=\'%236B7280\'/><circle cx=\'60\' cy=\'28\' r=\'5\' fill=\'%231F2A44\'/><circle cx=\'60\' cy=\'28\' r=\'3\' fill=\'%236B7280\'/></svg>'"
+    />
+
+    <!-- Speed readout overlay -->
+    <div class="speed-readout" id="speedReadout">
+      <span class="speed-label">RECORDED SPEED</span>
+      <span id="speedValue">— mph</span>
+    </div>
+
+  </section>
+
+  <!-- ===== TEST BUTTONS ===== -->
+  <div class="test-controls" role="group" aria-label="Test replay controls">
+    <button class="btn-test btn-test-1" id="btnTest1" onclick="runTest(1)" aria-label="Replay Test 1">
+      <span class="btn-icon">▶</span> Replay Test 1
+    </button>
+    <button class="btn-test btn-test-2" id="btnTest2" onclick="runTest(2)" aria-label="Replay Test 2">
+      <span class="btn-icon">▶</span> Replay Test 2
+    </button>
+    <button class="btn-test btn-test-3" id="btnTest3" onclick="runTest(3)" aria-label="Replay Test 3">
+      <span class="btn-icon">▶</span> Replay Test 3
+    </button>
+  </div>
+
+  <!-- ===== DATA LOG ===== -->
+  <div class="data-log-card" aria-label="Test Data Log">
+    <div class="card-title">Test Data Log</div>
+    <table class="data-table" aria-label="Recorded test results">
+      <thead>
+        <tr>
+          <th>Test Run</th>
+          <th>Status</th>
+          <th>Recorded Speed</th>
+          <th>Replayed At</th>
+        </tr>
+      </thead>
+      <tbody id="dataLogBody">
+        <!-- Rows populated by JS -->
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ===== FIELD JOURNAL ===== -->
+  <div class="field-journal-card" aria-label="Field Journal">
+    <div class="journal-inner">
+      <div class="journal-header">📓 Field Journal</div>
+      <p class="journal-prompt">
+        <strong>What led up to the changes in these crash tests?</strong>
+        How did the car's motion differ between the test runs?
+      </p>
+      <textarea
+        class="journal-textarea"
+        id="journalText"
+        placeholder="Write your observations here. What did you notice about how the car moved in each test?"
+        aria-label="Student journal response"
+        oninput="handleJournalInput()"
+      ></textarea>
+      <div class="autosave-indicator" id="autosaveIndicator">
+        Your writing will be saved automatically.
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== BOTTOM NAV ===== -->
+  <nav class="bottom-nav" aria-label="Section navigation">
+    <!--
+      Back button — calls goBack() which you can define in your parent page.
+      Replace or connect to your LMS/lesson navigation as needed.
+    -->
+    <button class="btn-nav btn-back" onclick="goBack()" aria-label="Go back">
+      ← Back
+    </button>
+
+    <span class="progress-hint">DP1 · Path A of 3</span>
+
+    <!--
+      Continue button — calls goToSection('dp1-convergence').
+      Replace the argument with your actual next-section ID or function.
+    -->
+    <button class="btn-nav btn-continue" onclick="goToSection('dp1-convergence')" aria-label="Continue to next section">
+      Continue →
+    </button>
+  </nav>
+
+</div><!-- /.page-wrapper -->
+
+
+<script>
+  /* ===========================================================
+     DP1 PATH A — JAVASCRIPT
+     Car animation, data log, journal autosave.
+     =========================================================== */
+
+  /* -----------------------------------------------------------
+     CONFIGURATION — ADJUST THESE VALUES TO FIT YOUR ASSETS
+     ----------------------------------------------------------- */
+
+  /**
+   * CAR START POSITION
+   * Percentage (%) from the LEFT edge of the track stage.
+   * 0 = far left, 100 = far right.
+   * Increase to start the car further to the right.
+   */
+  const CAR_START_X = 4;    // % from left — START position
+
+  /**
+   * CAR STOP POSITION (just before the barrier)
+   * Percentage (%) from the LEFT edge of the track stage.
+   * This is where the car stops. Make it slightly less than
+   * the barrier's visual position.
+   * The barrier is set to CSS right:6% → that's roughly left:80%
+   * (accounting for the car's own width ~12% of stage).
+   * Adjust if barrier lines up differently on your track image.
+   */
+  const CAR_STOP_X = 72;    // % from left — STOP position (just before barrier)
+
+  /**
+   * ANIMATION FRAME RATE
+   * How many pixels (% units) the car moves per animation frame.
+   * These are multipliers — actual speed also depends on TEST_SPEEDS below.
+   * A higher number = faster animation.
+   * Decrease both if all tests feel too fast; increase if too slow.
+   */
+  const FRAME_RATE_MS = 16;  // milliseconds per frame (~60fps) — don't change unless choppy
+
+  /**
+   * TEST SPEEDS — distance moved per frame (in % units)
+   * These are proportional to TEST_1_BASE_SPEED:
+   *   Test 2 is exactly 1/3 faster than Test 1 on screen.
+   *   Test 3 is exactly 2/3 faster than Test 1 on screen.
+   *
+   * To change all speeds together, only edit TEST_1_BASE_SPEED.
+   * The other two will scale automatically.
+   *
+   * Formula:
+   *   Test 2 = base × (4/3)  → 1/3 faster
+   *   Test 3 = base × (5/3)  → 2/3 faster
+   */
+  const TEST_1_BASE_SPEED = 0.25;   // ← ADJUST THIS to change all speeds proportionally
+
+  const TEST_SPEEDS = {
+    1: TEST_1_BASE_SPEED,                          // baseline
+    2: TEST_1_BASE_SPEED * (4 / 3),               // 1/3 faster  ≈ 0.333
+    3: TEST_1_BASE_SPEED * (5 / 3)                // 2/3 faster  ≈ 0.417
+  };
+
+  /**
+   * DISPLAYED SPEED READOUTS
+   * The mph number shown on screen after each test.
+   * These are the recorded speeds for the data log and readout overlay.
+   */
+  const TEST_MPH = {
+    1: 25,   // mph shown for Test 1
+    2: 40,   // mph shown for Test 2
+    3: 55    // mph shown for Test 3
+  };
+
+  /**
+   * LOCAL STORAGE KEY
+   * Used to save the journal text and log data between page visits.
+   * Change the prefix if you have multiple lessons to avoid collision.
+   */
+  const STORAGE_PREFIX = 'sins_dp1_pathA_';
+  const LS_JOURNAL_KEY  = STORAGE_PREFIX + 'journal';
+  const LS_LOG_KEY      = STORAGE_PREFIX + 'testLog';
+
+
+  /* -----------------------------------------------------------
+     STATE
+     ----------------------------------------------------------- */
+  let animationTimer  = null;    // holds the setInterval reference
+  let isAnimating     = false;   // true while car is moving
+  let currentCarX     = CAR_START_X;  // current car left% position
+
+  // Test log: tracks which tests have been replayed and when
+  let testLog = { 1: null, 2: null, 3: null }; // null = not yet run; Date string when run
+
+
+  /* -----------------------------------------------------------
+     INITIALISE ON PAGE LOAD
+     ----------------------------------------------------------- */
+  document.addEventListener('DOMContentLoaded', () => {
+    loadPersistedData();
+    resetCarToStart();
+    renderDataLog();
+  });
+
+
+  /* -----------------------------------------------------------
+     RUN A TEST
+     Called by the three buttons.
+     ----------------------------------------------------------- */
+  function runTest(testNumber) {
+    if (isAnimating) return;  // ignore clicks while a test is running
+
+    // Disable all buttons during animation
+    setButtonsDisabled(true);
+
+    // Mark which button is "running"
+    const btn = document.getElementById('btnTest' + testNumber);
+    btn.classList.add('running');
+    btn.textContent = ''; // rebuild with icon
+    const icon = document.createElement('span');
+    icon.className = 'btn-icon';
+    icon.textContent = '⏵';
+    btn.appendChild(icon);
+    btn.appendChild(document.createTextNode(` Running Test ${testNumber}…`));
+
+    // Hide speed readout while car is moving
+    hideSpeedReadout();
+
+    // Reset car to start
+    resetCarToStart();
+
+    // Brief pause so students see the reset before movement begins
+    setTimeout(() => {
+      animateCar(testNumber);
+    }, 400);
+  }
+
+
+  /* -----------------------------------------------------------
+     ANIMATE CAR ACROSS THE TRACK
+     Uses setInterval to move the car image incrementally.
+     ----------------------------------------------------------- */
+  function animateCar(testNumber) {
+    isAnimating = true;
+    const speedPerFrame = TEST_SPEEDS[testNumber];
+    const car = document.getElementById('carImage');
+
+    animationTimer = setInterval(() => {
+      currentCarX += speedPerFrame;
+
+      // Has the car reached the stop position?
+      if (currentCarX >= CAR_STOP_X) {
+        currentCarX = CAR_STOP_X;   // snap to exact stop position
+        car.style.left = currentCarX + '%';
+        finishTest(testNumber);
+        return;
+      }
+
+      car.style.left = currentCarX + '%';
+    }, FRAME_RATE_MS);
+  }
+
+
+  /* -----------------------------------------------------------
+     FINISH TEST — called when car reaches the barrier
+     ----------------------------------------------------------- */
+  function finishTest(testNumber) {
+    clearInterval(animationTimer);
+    isAnimating = false;
+
+    // Show speed readout
+    const mph = TEST_MPH[testNumber];
+    document.getElementById('speedValue').textContent = mph + ' mph';
+    showSpeedReadout();
+
+    // Log this test
+    const now = new Date();
+    testLog[testNumber] = now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    savePersistedData();
+    renderDataLog();
+
+    // Re-enable buttons; reset the clicked button label
+    setButtonsDisabled(false);
+    resetButtonLabel(testNumber);
+  }
+
+
+  /* -----------------------------------------------------------
+     CAR POSITION HELPERS
+     ----------------------------------------------------------- */
+  function resetCarToStart() {
+    clearInterval(animationTimer);
+    isAnimating = false;
+    currentCarX = CAR_START_X;
+    const car = document.getElementById('carImage');
+    car.style.left = CAR_START_X + '%';
+  }
+
+
+  /* -----------------------------------------------------------
+     SPEED READOUT HELPERS
+     ----------------------------------------------------------- */
+  function showSpeedReadout() {
+    document.getElementById('speedReadout').classList.add('visible');
+  }
+
+  function hideSpeedReadout() {
+    document.getElementById('speedReadout').classList.remove('visible');
+  }
+
+
+  /* -----------------------------------------------------------
+     BUTTON STATE HELPERS
+     ----------------------------------------------------------- */
+  function setButtonsDisabled(disabled) {
+    [1, 2, 3].forEach(n => {
+      document.getElementById('btnTest' + n).disabled = disabled;
+    });
+  }
+
+  function resetButtonLabel(testNumber) {
+    const btn = document.getElementById('btnTest' + testNumber);
+    btn.classList.remove('running');
+    btn.innerHTML = `<span class="btn-icon">▶</span> Replay Test ${testNumber}`;
+  }
+
+
+  /* -----------------------------------------------------------
+     DATA LOG RENDERER
+     ----------------------------------------------------------- */
+  function renderDataLog() {
+    const tbody = document.getElementById('dataLogBody');
+    tbody.innerHTML = '';
+
+    [1, 2, 3].forEach(n => {
+      const ran     = testLog[n] !== null;
+      const mph     = TEST_MPH[n];
+      const timeStr = testLog[n] || '—';
+
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-family:var(--font-display);font-size:14px;">Test ${n}</td>
+        <td>
+          <span class="log-status">
+            <span class="log-dot ${ran ? 'done' : ''}"></span>
+            ${ran ? 'Replayed' : 'Not yet run'}
+          </span>
+        </td>
+        <td>
+          ${ran
+            ? `<span class="log-speed">${mph} mph</span>`
+            : `<span class="log-speed empty">—</span>`
+          }
+        </td>
+        <td><span class="log-time">${timeStr}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+
+  /* -----------------------------------------------------------
+     FIELD JOURNAL — AUTOSAVE
+     ----------------------------------------------------------- */
+  let autosaveTimer = null;
+
+  function handleJournalInput() {
+    clearTimeout(autosaveTimer);
+    document.getElementById('autosaveIndicator').textContent = 'Saving…';
+    document.getElementById('autosaveIndicator').classList.remove('saved');
+
+    autosaveTimer = setTimeout(() => {
+      const text = document.getElementById('journalText').value;
+      try {
+        localStorage.setItem(LS_JOURNAL_KEY, text);
+        document.getElementById('autosaveIndicator').textContent = '✓ Saved';
+        document.getElementById('autosaveIndicator').classList.add('saved');
+      } catch (e) {
+        // localStorage might be blocked (e.g., private browsing without storage)
+        document.getElementById('autosaveIndicator').textContent = 'Could not save — browser storage unavailable.';
+      }
+    }, 800);
+  }
+
+
+  /* -----------------------------------------------------------
+     PERSIST & LOAD (localStorage)
+     ----------------------------------------------------------- */
+  function savePersistedData() {
+    try {
+      localStorage.setItem(LS_LOG_KEY, JSON.stringify(testLog));
+    } catch (e) { /* silent fail */ }
+  }
+
+  function loadPersistedData() {
+    // Load journal text
+    try {
+      const savedJournal = localStorage.getItem(LS_JOURNAL_KEY);
+      if (savedJournal !== null) {
+        document.getElementById('journalText').value = savedJournal;
+        document.getElementById('autosaveIndicator').textContent = '✓ Previous entry loaded';
+        document.getElementById('autosaveIndicator').classList.add('saved');
+      }
+    } catch (e) { /* silent fail */ }
+
+    // Load test log
+    try {
+      const savedLog = localStorage.getItem(LS_LOG_KEY);
+      if (savedLog) {
+        const parsed = JSON.parse(savedLog);
+        // Only restore if it has the expected shape
+        if (parsed && typeof parsed === 'object') {
+          [1, 2, 3].forEach(n => {
+            if (parsed[n] !== undefined) testLog[n] = parsed[n];
+          });
+        }
+      }
+    } catch (e) { /* silent fail */ }
+  }
+
+
+  /* -----------------------------------------------------------
+     NAVIGATION PLACEHOLDERS
+     Replace these with your actual lesson navigation logic.
+     ----------------------------------------------------------- */
+
+  /**
+   * goBack() — called by the Back button.
+   * Connect to your lesson router / LMS navigation here.
+   */
+  function goBack() {
+    // PLACEHOLDER: replace with actual back navigation
+    console.log('[DP1 Path A] goBack() called — connect to your lesson router.');
+    alert('Back navigation placeholder — connect goBack() to your lesson system.');
+  }
+
+  /**
+   * goToSection(sectionId) — called by the Continue button.
+   * Connect to your lesson router / LMS navigation here.
+   * @param {string} sectionId — the ID of the next section to load
+   */
+  function goToSection(sectionId) {
+    // PLACEHOLDER: replace with actual navigation
+    console.log('[DP1 Path A] goToSection called with:', sectionId);
+    alert(`Continue navigation placeholder → "${sectionId}"\nConnect goToSection() to your lesson system.`);
+  }
+
+</script>
+</body>
+</html>
