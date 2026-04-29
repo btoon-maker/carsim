@@ -181,7 +181,7 @@
     .car-on-track {
       position: absolute;
       /* ── ADJUST: CAR VERTICAL POSITION ─ move up/down to sit on your track surface ── */
-      bottom: 35px;       /* pixels from bottom of stage — increase to move car up */
+      bottom: 18px;       /* pixels from bottom of stage — increase to move car up */
       /* ── ADJUST: CAR SIZE ── */
       width: 220px;
       height: auto;
@@ -724,7 +724,7 @@
    * 0 = far left, 100 = far right.
    * Increase to start the car further to the right.
    */
-  const CAR_START_X = 4;    // % from left — START position
+  const CAR_START_X = 8;    // % from left — START position
 
   /**
    * CAR STOP POSITION (just before the barrier)
@@ -735,7 +735,7 @@
    * (accounting for the car's own width ~12% of stage).
    * Adjust if barrier lines up differently on your track image.
    */
-  const CAR_STOP_X = 66;    // % from left — STOP position (just before barrier)
+  const CAR_STOP_X = 64;    // % from left — STOP position (just before barrier)
 
   /**
    * ANIMATION FRAME RATE
