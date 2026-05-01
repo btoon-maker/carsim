@@ -573,6 +573,27 @@
     .field-journal-card { animation: fadeSlideDown 0.5s 0.4s ease both; }
     .bottom-nav     { animation: fadeSlideDown 0.5s 0.5s ease both; }
 
+    .obs-textarea {
+      width: 100%;
+      min-height: 60px;
+      padding: 8px 10px;
+      border: 1.5px solid rgba(107,114,128,0.4);
+      border-radius: var(--radius-sm);
+      background: rgba(255,255,255,0.06);
+      color: var(--offwhite);
+      font-family: var(--font-body);
+      font-size: 13px;
+      line-height: 1.5;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+    .obs-textarea:focus {
+      border-color: var(--blue);
+      box-shadow: 0 0 0 3px var(--blue-glow);
+    }
+    .obs-textarea::placeholder { color: var(--steelgray); }
+
   </style>
 </head>
 <body>
@@ -581,10 +602,8 @@
 
   <!-- ===== HEADER ===== -->
   <header class="header-banner">
-    <span class="header-badge">DP1 · PATH A</span>
     <div class="header-titles">
       <h1>What Led Up to the Changes?</h1>
-      <p>Where Did the Energy Go? — 5th Grade SINS Investigation</p>
     </div>
   </header>
 
@@ -619,24 +638,20 @@
       onerror="this.src='data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 80 32\'><rect x=\'2\' y=\'10\' width=\'76\' height=\'16\' rx=\'4\' fill=\'%23F97316\'/><rect x=\'10\' y=\'6\' width=\'40\' height=\'14\' rx=\'3\' fill=\'%23EA580C\'/><circle cx=\'14\' cy=\'28\' r=\'5\' fill=\'%231F2A44\'/><circle cx=\'14\' cy=\'28\' r=\'3\' fill=\'%236B7280\'/><circle cx=\'60\' cy=\'28\' r=\'5\' fill=\'%231F2A44\'/><circle cx=\'60\' cy=\'28\' r=\'3\' fill=\'%236B7280\'/></svg>'"
     />
 
-    <!-- Speed readout overlay -->
-    <div class="speed-readout" id="speedReadout">
-      <span class="speed-label">RECORDED SPEED</span>
-      <span id="speedValue">— mph</span>
-    </div>
+
 
   </section>
 
   <!-- ===== TEST BUTTONS ===== -->
   <div class="test-controls" role="group" aria-label="Test replay controls">
-    <button class="btn-test btn-test-1" id="btnTest1" onclick="runTest(1)" aria-label="Replay Test 1">
-      <span class="btn-icon">▶</span> Replay Test 1
+    <button class="btn-test btn-test-1" id="btnTest1" onclick="runTest(1)" aria-label="Replay Test Run 1">
+      <span class="btn-icon">▶</span> Replay Test Run 1
     </button>
-    <button class="btn-test btn-test-2" id="btnTest2" onclick="runTest(2)" aria-label="Replay Test 2">
-      <span class="btn-icon">▶</span> Replay Test 2
+    <button class="btn-test btn-test-2" id="btnTest2" onclick="runTest(2)" aria-label="Replay Test Run 2">
+      <span class="btn-icon">▶</span> Replay Test Run 2
     </button>
-    <button class="btn-test btn-test-3" id="btnTest3" onclick="runTest(3)" aria-label="Replay Test 3">
-      <span class="btn-icon">▶</span> Replay Test 3
+    <button class="btn-test btn-test-3" id="btnTest3" onclick="runTest(3)" aria-label="Replay Test Run 3">
+      <span class="btn-icon">▶</span> Replay Test Run 3
     </button>
   </div>
 
@@ -648,7 +663,7 @@
         <tr>
           <th>Test Run</th>
           <th>Status</th>
-          <th>Recorded Speed</th>
+          <th>Observation</th>
           <th>Replayed At</th>
         </tr>
       </thead>
@@ -757,9 +772,9 @@
   const TEST_1_BASE_SPEED = 0.25;   // ← ADJUST THIS to change all speeds proportionally
 
   const TEST_SPEEDS = {
-    1: TEST_1_BASE_SPEED,                          // baseline
-    2: TEST_1_BASE_SPEED * (5 / 3),               // 1/3 faster  ≈ 0.333
-    3: TEST_1_BASE_SPEED * (7 / 3)                // 2/3 faster  ≈ 0.417
+    1: TEST_1_BASE_SPEED,                          // LOW  — slowest
+    2: TEST_1_BASE_SPEED * (7 / 3),               // HIGH — fastest
+    3: TEST_1_BASE_SPEED * (5 / 3)                // MEDIUM — middle
   };
 
   /**
@@ -779,8 +794,9 @@
    * Change the prefix if you have multiple lessons to avoid collision.
    */
   const STORAGE_PREFIX = 'sins_dp1_pathA_';
-  const LS_JOURNAL_KEY  = STORAGE_PREFIX + 'journal';
-  const LS_LOG_KEY      = STORAGE_PREFIX + 'testLog';
+  const LS_JOURNAL_KEY      = STORAGE_PREFIX + 'journal';
+  const LS_LOG_KEY          = STORAGE_PREFIX + 'testLog';
+  const LS_OBSERVATIONS_KEY = STORAGE_PREFIX + 'observations';
 
 
   /* -----------------------------------------------------------
@@ -792,6 +808,7 @@
 
   // Test log: tracks which tests have been replayed and when
   let testLog = { 1: null, 2: null, 3: null }; // null = not yet run; Date string when run
+  let observations = { 1: '', 2: '', 3: '' };  // student observation per test run
 
 
   /* -----------------------------------------------------------
@@ -824,8 +841,7 @@
     btn.appendChild(icon);
     btn.appendChild(document.createTextNode(` Running Test ${testNumber}…`));
 
-    // Hide speed readout while car is moving
-    hideSpeedReadout();
+    // Hide speed readout while car is moving — removed (speed no longer displayed)
 
     // Reset car to start
     resetCarToStart();
@@ -868,11 +884,6 @@
   function finishTest(testNumber) {
     clearInterval(animationTimer);
     isAnimating = false;
-
-    // Show speed readout
-    const mph = TEST_MPH[testNumber];
-    document.getElementById('speedValue').textContent = mph + ' mph';
-    showSpeedReadout();
 
     // Log this test
     const now = new Date();
@@ -922,7 +933,7 @@
   function resetButtonLabel(testNumber) {
     const btn = document.getElementById('btnTest' + testNumber);
     btn.classList.remove('running');
-    btn.innerHTML = `<span class="btn-icon">▶</span> Replay Test ${testNumber}`;
+    btn.innerHTML = `<span class="btn-icon">▶</span> Replay Test Run ${testNumber}`;
   }
 
 
@@ -935,12 +946,11 @@
 
     [1, 2, 3].forEach(n => {
       const ran     = testLog[n] !== null;
-      const mph     = TEST_MPH[n];
       const timeStr = testLog[n] || '—';
 
       const tr = document.createElement('tr');
       tr.innerHTML = `
-        <td style="font-family:var(--font-display);font-size:14px;">Test ${n}</td>
+        <td style="font-family:var(--font-display);font-size:14px;">Test Run ${n}</td>
         <td>
           <span class="log-status">
             <span class="log-dot ${ran ? 'done' : ''}"></span>
@@ -948,15 +958,26 @@
           </span>
         </td>
         <td>
-          ${ran
-            ? `<span class="log-speed">${mph} mph</span>`
-            : `<span class="log-speed empty">—</span>`
-          }
+          <textarea
+            class="obs-textarea"
+            placeholder="Record an observation..."
+            aria-label="Observation for Test Run ${n}"
+            oninput="saveObservation(${n}, this.value)"
+          ></textarea>
         </td>
         <td><span class="log-time">${timeStr}</span></td>
       `;
       tbody.appendChild(tr);
+      // Restore saved observation value
+      tr.querySelector('textarea').value = observations[n] || '';
     });
+  }
+
+  function saveObservation(n, value) {
+    observations[n] = value;
+    try {
+      localStorage.setItem(LS_OBSERVATIONS_KEY, JSON.stringify(observations));
+    } catch (e) { /* silent fail */ }
   }
 
 
@@ -990,6 +1011,7 @@
   function savePersistedData() {
     try {
       localStorage.setItem(LS_LOG_KEY, JSON.stringify(testLog));
+      localStorage.setItem(LS_OBSERVATIONS_KEY, JSON.stringify(observations));
     } catch (e) { /* silent fail */ }
   }
 
@@ -1009,10 +1031,22 @@
       const savedLog = localStorage.getItem(LS_LOG_KEY);
       if (savedLog) {
         const parsed = JSON.parse(savedLog);
-        // Only restore if it has the expected shape
         if (parsed && typeof parsed === 'object') {
           [1, 2, 3].forEach(n => {
             if (parsed[n] !== undefined) testLog[n] = parsed[n];
+          });
+        }
+      }
+    } catch (e) { /* silent fail */ }
+
+    // Load observations
+    try {
+      const savedObs = localStorage.getItem(LS_OBSERVATIONS_KEY);
+      if (savedObs) {
+        const parsed = JSON.parse(savedObs);
+        if (parsed && typeof parsed === 'object') {
+          [1, 2, 3].forEach(n => {
+            if (parsed[n] !== undefined) observations[n] = parsed[n];
           });
         }
       }
