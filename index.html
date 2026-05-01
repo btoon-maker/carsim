@@ -156,27 +156,6 @@
       padding-bottom: 32px;
     }
 
-    /* ── ADJUST: barrier position = how far from the left the wall is (percentage) ── */
-    .barrier {
-      position: absolute;
-      /* BARRIER X POSITION — change this value to move the wall left or right */
-      right: 8%;
-      /* BARRIER Y — aligns barrier vertically on the track surface */
-      bottom: 0;
-      top: 0;
-      width: 14px;
-      background: repeating-linear-gradient(
-        -45deg,
-        var(--orange) 0px, var(--orange) 6px,
-        #1F2A44 6px, #1F2A44 12px
-      );
-      border-left: 3px solid var(--orange);
-      border-radius: 2px;
-      box-shadow: -4px 0 16px rgba(249,115,22,0.5);
-      /* Uncomment next line to hide the barrier if your background image already shows one: */
-      /* display: none; */
-    }
-
     /* Car image on track */
 .car-on-track {
   position: absolute;
@@ -622,8 +601,6 @@
       onerror="this.style.display='none'"
     />
 
-    <!-- Barrier stripe (hide if your track image already shows a barrier) -->
-    <div class="barrier" id="barrier" aria-hidden="true"></div>
 
     <!--
       CAR IMAGE
